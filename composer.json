@@ -1,0 +1,17 @@
+{
+    "name": "uktech/fh-libphonenumber",
+    "description": "foodhub wrapper for google libphonenumber for E164 format",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Uktech\\FhLibphonenumber\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "foodhub"
+        }
+    ],
+    "require": {}
+}

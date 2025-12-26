@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  composer:
+    image: composer
+    volumes:
+      - /Users/dev/workspace/projects/libphonenumber:/app
+    working_dir: /app
+    command: composer install
+    stdin_open: true
+    tty: true
+
