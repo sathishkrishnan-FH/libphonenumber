@@ -13,6 +13,7 @@ use libphonenumber\PhoneNumberToTimeZonesMapper;
 use libphonenumber\PhoneNumberMatcher;
 use libphonenumber\AsYouTypeFormatter;
 use libphonenumber\PhoneNumber;
+use Exception;
 
 /**
  * Wrapper class for giggsey/libphonenumber-for-php
@@ -270,24 +271,24 @@ class PhoneNumberWrapper
      * @param int $leniency Matching leniency (VALID, POSSIBLE, EXACT_GROUPING, etc.)
      * @return array Array of matched phone number objects
      */
-    public function findNumbers(string $text, ?string $defaultRegion = null, int $leniency = PhoneNumberMatcher::Leniency::VALID): array
-    {
-        $matches = [];
-        try {
-            $matcher = $this->phoneNumberUtil->findNumbers($text, $defaultRegion, $leniency);
-            foreach ($matcher as $match) {
-                $matches[] = [
-                    'number' => $match->number(),
-                    'raw_string' => $match->rawString(),
-                    'start' => $match->start(),
-                    'end' => $match->end(),
-                ];
-            }
-        } catch (\Exception $e) {
-            // Return empty array on error
-        }
-        return $matches;
-    }
+    // public function findNumbers(string $text, ?string $defaultRegion = null, int $leniency = PhoneNumberMatcher::Leniency::VALID): array
+    // {
+    //     $matches = [];
+    //     try {
+    //         $matcher = $this->phoneNumberUtil->findNumbers($text, $defaultRegion, $leniency);
+    //         foreach ($matcher as $match) {
+    //             $matches[] = [
+    //                 'number' => $match->number(),
+    //                 'raw_string' => $match->rawString(),
+    //                 'start' => $match->start(),
+    //                 'end' => $match->end(),
+    //             ];
+    //         }
+    //     } catch (\Exception $e) {
+    //         // Return empty array on error
+    //     }
+    //     return $matches;
+    // }
 
     /**
      * Phone Number Matcher - Find all phone numbers in a text string (returns phone number objects only)
@@ -388,6 +389,87 @@ class PhoneNumberWrapper
     public function getTimeZoneMapper(): PhoneNumberToTimeZonesMapper
     {
         return $this->timeZoneMapper;
+    }
+
+    /**
+     * Validate E164 phone number against country code and length requirements
+     *
+     * @param string $phoneNumber The E164 phone number
+     * @param string $expectedCountryCode The expected country code (e.g., 'US', 'GB')
+     * @return array ['valid' => bool, 'message' => string, 'country_code' => string|null]
+     */
+    public function validateE164PhoneWithCountry(string $phoneNumber, ?string $expectedCountryCode = null): array
+    {
+        try {
+            $parsedNumber = $this->phoneNumberUtil->parse($phoneNumber, $expectedCountryCode);
+
+            // Check if valid
+            if (!$this->phoneNumberUtil->isValidNumber($parsedNumber)) {
+                return [
+                    'valid' => false,
+                    'message' => 'The phone number is not valid.',
+                    'country_code' => null
+                ];
+            }
+
+            // Get the actual country code
+            $actualCountryCode = $this->phoneNumberUtil->getRegionCodeForNumber($parsedNumber);
+
+            // If expected country code is provided, verify it matches
+            if ($expectedCountryCode && $actualCountryCode !== $expectedCountryCode) {
+                return [
+                    'valid' => false,
+                    'message' => "Phone number country code '{$actualCountryCode}' does not match expected '{$expectedCountryCode}'.",
+                    'country_code' => $actualCountryCode
+                ];
+            }
+
+            // Check if it's in E164 format
+            $formattedNumber = $this->phoneNumberUtil->format($parsedNumber, PhoneNumberFormat::E164);
+
+            if ($formattedNumber !== $phoneNumber) {
+                return [
+                    'valid' => false,
+                    'message' => 'Phone number must be in E164 format (e.g., +1234567890).',
+                    'country_code' => $actualCountryCode
+                ];
+            }
+
+            // Check number type (mobile, landline, etc.)
+            $numberType = $this->phoneNumberUtil->getNumberType($parsedNumber);
+
+            $validTypes = [
+                \libphonenumber\PhoneNumberType::MOBILE,
+                \libphonenumber\PhoneNumberType::FIXED_LINE_OR_MOBILE,
+                \libphonenumber\PhoneNumberType::VOIP
+            ];
+
+            if (isset($numberType) && !in_array($numberType->name, $validTypes)) {
+                return [
+                    'valid' => false,
+                    'message' => 'Phone number must be a valid mobile or landline number.',
+                    'country_code' => $actualCountryCode
+                ];
+            }
+
+            return [
+                'valid' => true,
+                'message' => 'Phone number is valid.',
+                'country_code' => $actualCountryCode
+            ];
+        } catch (NumberParseException $e) {
+            return [
+                'valid' => false,
+                'message' => 'Invalid phone number format. Please use E164 format (e.g., +1234567890).',
+                'country_code' => null
+            ];
+        } catch (Exception $e) {
+            return [
+                'valid' => false,
+                'message' => 'Invalid phone number format. Please use E164 format (e.g., +1234567890).',
+                'country_code' => null
+            ];
+        }
     }
 }
 
